@@ -10,7 +10,7 @@ fw_api_key=SPECIFY
 # build the flywheel version of the docker container
 docker build -t "astewartau/qsmxt_flywheel_${qsmxt_version}:${build_date}" . -f qsm.Dockerfile
 
-# push to vnm (if you have permission..)
+# push to dockerhub (if you have permission..)
 docker push "astewartau/qsmxt_flywheel_${qsmxt_version}:${build_date}"
 
 # test the flywheel gear locally
