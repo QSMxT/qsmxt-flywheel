@@ -15,7 +15,7 @@ docker push "astewartau/qsmxt_flywheel_${qsmxt_version}:${build_date}"
 
 # test the flywheel gear locally
 cd v0/
-fw gear local --magnitude=input/mag.zip --phase=input/phs.zip # the .zips should have DICOMs
+fw gear local --qsm_iterations=1 --magnitude=input/mag.zip --phase=input/phs.zip # the .zips should have DICOMs
 
 # login and upload to flywheel
 fw login "${fw_instance}.flywheel.io:${fw_api_key}"
