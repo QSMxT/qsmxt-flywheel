@@ -1,11 +1,12 @@
 {
-    "name": "QSMxT",
-    "label": "QSMxT",
-    "description": "QSMxT is a complete and end-to-end QSM processing and analysis framework that excels at automatically reconstructing and processing QSM for large groups of participants",
+    "name": "qsmxt",
+    "label": "QSMxT for Automated Quantitative Susceptibility Mapping",
+    "description": "QSMxT is an end-to-end pipeline for Quantitative Susceptibility Mapping (QSM).",
     "author": "Ashley Stewart",
-    "url": "https://www.neurodesk.org/",
+    "cite": "Stewart, Ashley Wilton, et al. \"QSMxT: Robust masking and artifact reduction for quantitative susceptibility mapping.\" Magnetic resonance in medicine 87.3 (2022): 1289-1300.",
+    "url": "https://github.com/QSMxT/QSMxT",
     "source": "https://github.com/QSMxT/QSMxT",
-    "license": "GPL-3.0-only",
+    "license": "GPL-3.0",
     "version": "1.1.13",
     "environment": {
         "PATH": "/opt/miniconda-4.7.12.1/bin:/opt/miniconda-4.7.12.1/condabin:/opt/miniconda-4.7.12.1/bin:/opt/dcm2niix-003f0d19f1e57b0129c9dcf3e653f51ca3559028/bin:/opt/ants-2.3.4:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/TGVQSM/tgvqsm-1.0.0:/opt/FastSurfer:/opt/bru2:/opt/julia-1.6.1/bin:/opt/QSMxT:/opt/QSMxT/scripts"
@@ -19,7 +20,6 @@
     "config": {
         "qsm_iterations": {
             "description": "TGV QSM Iterations",
-            "optional": false,
             "type": "integer",
             "min": 1,
             "max": 2000,
