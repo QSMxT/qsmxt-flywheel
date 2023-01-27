@@ -1,94 +1,70 @@
 #!/usr/bin/env python3
 
-# This backend config avoids $DISPLAY errors in headless machines
-#import matplotlib
-#matplotlib.use('Agg')
-
 import subprocess
 import glob
 import os
-import json
 
-from zipfile import ZipFile
-from subprocess import call
-from os.path import basename
-
+import zipfile as zf
+import flywheel
 
 def flywheel_run():
-    # The file that will be initially run by Flywheel. This should run any scripts, QSMxT or otherwise
-    print("run.py has started...")
 
-    #takes config and input from config.json
-    with open('config.json') as config:
-        config = json.load(config)
+    # load inputs and configuration from FlyWheel context
+    with flywheel.GearContext() as context:
+        config = context.config
+        mag_dicom_zip = context.get_input_path('magnitude')
+        phs_dicom_zip = context.get_input_path('phase')
+        out_dir = context.output_dir
 
-    qsm_iterations = config["config"]["qsm_iterations"]
-    with ZipFile('/flywheel/v0/input/magnitude/mag.zip', 'r') as zipObj:
-        zipObj.extractall('/flywheel/v0/input/magnitude/')
+    # extract DICOMs
+    with zf.ZipFile(mag_dicom_zip, 'r') as zipObj:
+        zipObj.extractall('/0_dicoms/magnitude')
 
-    with ZipFile('/flywheel/v0/input/phase/phs.zip', 'r') as zipObj:
-        zipObj.extractall('/flywheel/v0/input/phase/')
+    with zf.ZipFile(phs_dicom_zip, 'r') as zipObj:
+        zipObj.extractall('/0_dicoms/phase')
 
-    print("QSM Iterations:  ", qsm_iterations)
-
-    print("Sorting DICOM data...")
-    call([
+    # sort DICOMs
+    complete_process = subprocess.run([
         "python3",
         "/opt/QSMxT/run_0_dicomSort.py",
-        "/flywheel/v0/input",  # input - this should be in the Flywheel input folder!
-        "/00_dicom"
+        "/0_dicoms",
+        "/1_dicoms-sorted"
     ])
-    ima_files = glob.glob("/00_dicom/**/*.IMA", recursive=True)
-    print('found ' + str(len(ima_files)) + ' ima_files after Sorting DICOM data in /00_dicom')
 
-    print("Converting DICOM data...")
-    try:
-        retcode = call([
-            "python3",
-            "/opt/QSMxT/run_1_dicomConvert.py",
-            "/00_dicom/",
-            "/01_bids",
-            "--auto_yes"
-        ])
-        if retcode < 0:
-            print("Converting DICOM data was terminated by signal " + str(retcode))
-        else:
-            print("Converting DICOM data returned " + str(retcode))
-    except Exception as e:
-        print("Converting DICOM data failed:" + e)
-        raise
+    # convert to BIDS
+    complete_process = subprocess.run([
+        "python3",
+        "/opt/QSMxT/run_1_dicomConvert.py",
+        "/1_dicoms-sorted/",
+        "/2_bids",
+        "--auto_yes"
+    ])
 
-    nii_files = glob.glob("/01_bids/**/anat/*.nii*", recursive=True)
-    print('found ' + str(len(nii_files)) + ' nii_files after Converting DICOM data in /01_bids')
-
-    print('Run QSM pipeline ...')
-
-    CompletedProcess = subprocess.run([
+    # do QSM
+    complete_process = subprocess.run([
         "python3",
         "/opt/QSMxT/run_2_qsm.py",
-        "--qsm_iterations",
-        str(qsm_iterations),
-        "/01_bids",
-        "/02_qsm_output"
-    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
-    print('QSM pipeline stdout: ' + CompletedProcess.stdout)
-    print('QSM pipeline stderr: ' + CompletedProcess.stderr)
+        "/2_bids",
+        "/3_qsm",
+        "--tgv_iterations", str(config['tgv_iterations'])
+    ])
 
-    output_file = glob.glob("/02_qsm_output/qsm_final/*.nii*")
-    print('outputfile is ... ' + output_file[0])
-    print('Zipping and moving files to the output directory...')
+    # collect qsm outputs
+    with zf.ZipFile(os.path.join(out_dir, 'qsm.zip'), 'w') as zipObj:
+        for folderName, subfolders, filenames in os.walk("/3_qsm/qsm_final/"):
+            for filename in filenames:
+                filePath = os.path.join(folderName, filename)
+                zipObj.write(filePath, os.path.basename(filePath))
 
-    # create a ZipFile object
-    with ZipFile('/flywheel/v0/output/output.zip', 'w') as zipObj:
-       # Iterate over all the files in directory
-       for folderName, subfolders, filenames in os.walk("/02_qsm_output/qsm_final/"):
-           for filename in filenames:
-               #create complete filepath of file in directory
-               filePath = os.path.join(folderName, filename)
-               # Add file to zip
-               zipObj.write(filePath, basename(filePath))
+    # collect crash outputs
+    with zf.ZipFile(os.path.join(out_dir, 'crashes.zip'), 'w') as zipObj:
+        crash_files = glob.glob("/flywheel/v0/crash*.pklz")
+        for crash in crash_files:
+            zipObj.write(crash, os.path.basename(crash))
 
-    print('Exiting...')
+    # collect workflow
+    zf.main(['-c', os.path.join(out_dir, 'workflow.zip'), '/3_qsm/workflow_qsm'])
+
     exit(0)
 
 

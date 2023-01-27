@@ -3,22 +3,27 @@
     "label": "QSMxT for Automated Quantitative Susceptibility Mapping",
     "description": "QSMxT is an end-to-end pipeline for Quantitative Susceptibility Mapping (QSM).",
     "author": "Ashley Stewart",
-    "cite": "Stewart, Ashley Wilton, et al. \"QSMxT: Robust masking and artifact reduction for quantitative susceptibility mapping.\" Magnetic resonance in medicine 87.3 (2022): 1289-1300.",
+    "cite": " Stewart, SW, Robinson, SD, O'Brien, K, et al. QSMxT: Robust masking and artifact reduction for quantitative susceptibility mapping. Magn Reson Med. 2022; 87: 1289-1300. doi:10.1002/mrm.29048 ",
     "url": "https://github.com/QSMxT/QSMxT",
     "source": "https://github.com/QSMxT/QSMxT",
     "license": "GPL-3.0",
-    "version": "1.1.13",
+    "version": "1.2.0_20230127-4",
     "environment": {
-        "PATH": "/opt/miniconda-4.7.12.1/bin:/opt/miniconda-4.7.12.1/condabin:/opt/miniconda-4.7.12.1/bin:/opt/dcm2niix-003f0d19f1e57b0129c9dcf3e653f51ca3559028/bin:/opt/ants-2.3.4:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/TGVQSM/tgvqsm-1.0.0:/opt/FastSurfer:/opt/bru2:/opt/julia-1.6.1/bin:/opt/QSMxT:/opt/QSMxT/scripts"
+        "PATH": "/opt/miniconda-4.7.12.1/bin:/opt/miniconda-4.7.12.1/condabin:/opt/miniconda-4.7.12.1/bin:/opt/dcm2niix-003f0d19f1e57b0129c9dcf3e653f51ca3559028/bin:/opt/ants-2.3.4:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/TGVQSM/tgvqsm-1.0.0:/opt/FastSurfer:/opt/bru2:/opt/julia-1.6.1/bin:/opt/QSMxT:/opt/QSMxT/scripts",
+        "PYTHONPATH": "/opt/TGVQSM/TGVQSM-master-011045626121baa8bfdd6633929974c732ae35e3/TGV_QSM:/opt/QSMxT",
+        "SUBJECTS_DIR":  "/tmp",
+        "JULIA_DEPOT_PATH": "~/.julia:/opt/julia_depot",
+        "FASTSURFER_HOME": "/opt/FastSurfer",
+        "ANTSPATH": "/opt/ants-2.3.4"
     },
     "custom": {
         "gear-builder": {
             "category": "analysis",
-            "image": "astewartau/qsmxt_flywheel_1.1.13:20230119"
+            "image": "astewartau/qsmxt_flywheel_1.2.0:20230127"
         }
     },
     "config": {
-        "qsm_iterations": {
+        "tgv_iterations": {
             "description": "TGV QSM Iterations",
             "type": "integer",
             "min": 1,

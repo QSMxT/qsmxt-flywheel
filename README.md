@@ -9,8 +9,8 @@ export PATH=$PATH:$PWD/linux_amd64
 
 ```bash
 # specify some version information
-qsmxt_version=1.1.13
-build_date=20220119
+qsmxt_version=1.2.0
+build_date=20230127
 fw_instance=SPECIFY
 fw_api_key=SPECIFY
 docker_id=SPECIFY
