@@ -46,7 +46,10 @@ def flywheel_run():
         "/opt/QSMxT/run_2_qsm.py",
         "/2_bids",
         "/3_qsm",
-        "--tgv_iterations", str(config['tgv_iterations'])
+        "--masking_algorithm", "bet",
+        "--unwrapping_algorithm", "romeo",
+        "--bf_algorithm", "pdf",
+        "--qsm_algorithm", "rts"
     ])
 
     # collect qsm outputs
@@ -56,14 +59,17 @@ def flywheel_run():
                 filePath = os.path.join(folderName, filename)
                 zipObj.write(filePath, os.path.basename(filePath))
 
-    # collect crash outputs
-    with zf.ZipFile(os.path.join(out_dir, 'crashes.zip'), 'w') as zipObj:
-        crash_files = glob.glob("/flywheel/v0/crash*.pklz")
-        for crash in crash_files:
-            zipObj.write(crash, os.path.basename(crash))
-
     # collect workflow
     zf.main(['-c', os.path.join(out_dir, 'workflow.zip'), '/3_qsm/workflow_qsm'])
+    
+    # collect crash outputs
+    crash_files = glob.glob("/flywheel/v0/crash*.pklz")
+    if crash_files:
+        with zf.ZipFile(os.path.join(out_dir, 'crashes.zip'), 'w') as zipObj:
+            for crash in crash_files:
+                zipObj.write(crash, os.path.basename(crash))
+        print("CRASHES OCCURRED! Inspect workflow.zip and crashes.zip...")
+        exit(1)
 
     exit(0)
 
