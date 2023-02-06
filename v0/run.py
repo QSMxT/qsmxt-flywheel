@@ -46,10 +46,8 @@ def flywheel_run():
         "/opt/QSMxT/run_2_qsm.py",
         "/2_bids",
         "/3_qsm",
-        "--masking_algorithm", "bet",
-        "--unwrapping_algorithm", "romeo",
-        "--bf_algorithm", "pdf",
-        "--qsm_algorithm", "rts"
+        "--premade", str(config['premade']),
+        "--non_interactive"
     ])
 
     # collect qsm outputs

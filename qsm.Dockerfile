@@ -1,5 +1,5 @@
 # start with qsmxt container
-FROM vnmd/qsmxt_1.2.0:20221208
+FROM vnmd/qsmxt_1.3.2:20230204
 
 WORKDIR /root
 
