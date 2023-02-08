@@ -13,7 +13,7 @@ qsmxt_version=1.3.2
 build_date=20230204
 fw_instance=SPECIFY
 fw_api_key=SPECIFY
-docker_id=SPECIFY
+docker_id=astewartau
 
 fw login ${fw_instance}.flywheel.io:${fw_api_key}
 
