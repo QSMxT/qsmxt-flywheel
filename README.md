@@ -23,12 +23,9 @@ docker build -t "${docker_id}/qsmxt_flywheel_${qsmxt_version}:${build_date}" . -
 # push to dockerhub (if you have permission..)
 docker push "${docker_id}/qsmxt_flywheel_${qsmxt_version}:${build_date}"
 
-# Replace docker_id in manifest file
-
 # test the flywheel gear locally
 cd v0/
-fw gear local --qsm_iterations=1 --magnitude=input/mag.zip --phase=input/phs.zip # the .zips should have DICOMs
-
+fw gear local --premade='gre' --magnitude=input/mag.zip --phase=input/phs.zip # the .zips should have DICOMs
 
 # login and upload to flywheel
 fw login "${fw_instance}.flywheel.io:${fw_api_key}"

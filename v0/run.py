@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import shutil
 import subprocess
 import glob
 import os
@@ -50,15 +51,12 @@ def flywheel_run():
         "--non_interactive"
     ])
 
-    # collect qsm outputs
-    with zf.ZipFile(os.path.join(out_dir, 'qsm.zip'), 'w') as zipObj:
-        for folderName, subfolders, filenames in os.walk("/3_qsm/qsm_final/"):
-            for filename in filenames:
-                filePath = os.path.join(folderName, filename)
-                zipObj.write(filePath, os.path.basename(filePath))
+    # collect workflow in zip and delete folder
+    shutil.make_archive(os.path.join(out_dir, 'workflow'), 'zip', '/3_qsm/workflow_qsm')
+    shutil.rmtree(os.path.join(out_dir, '/3_qsm/workflow_qsm'))
 
-    # collect workflow
-    zf.main(['-c', os.path.join(out_dir, 'workflow.zip'), '/3_qsm/workflow_qsm'])
+    # collect remaining QSMxT outputs
+    shutil.make_archive(os.path.join(out_dir, 'qsm'), 'zip', '/3_qsm/')
     
     # collect crash outputs
     crash_files = glob.glob("/flywheel/v0/crash*.pklz")
