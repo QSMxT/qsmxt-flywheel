@@ -10,7 +10,7 @@ export PATH=$PATH:$PWD/linux_amd64
 ```bash
 # specify some version information
 qsmxt_version=1.3.2
-build_date=20230204
+build_date=20230220
 fw_instance=SPECIFY
 fw_api_key=SPECIFY
 docker_id=astewartau
@@ -18,10 +18,10 @@ docker_id=astewartau
 fw login ${fw_instance}.flywheel.io:${fw_api_key}
 
 # build the flywheel version of the docker container
-docker build -t "${docker_id}/qsmxt_flywheel_${qsmxt_version}:${build_date}" . -f qsm.Dockerfile
+docker build -t "${docker_id}/qsmxt_flywheel:${qsmxt_version}_${build_date}" . -f qsm.Dockerfile
 
 # push to dockerhub (if you have permission..)
-docker push "${docker_id}/qsmxt_flywheel_${qsmxt_version}:${build_date}"
+docker push "${docker_id}/qsmxt_flywheel:${qsmxt_version}_${build_date}"
 
 # test the flywheel gear locally
 cd v0/
