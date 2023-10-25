@@ -47,7 +47,7 @@ def flywheel_run():
         "/3_qsm",
         "--premade", str(config['premade']),
         "--auto_yes"
-    ])
+    ] + str(config['qsmxt_cmd_args']).split())
 
     # collect workflow in zip and delete folder
     shutil.make_archive(os.path.join(out_dir, 'workflow'), 'zip', '/3_qsm/workflow')
