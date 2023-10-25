@@ -9,25 +9,23 @@ export PATH=$PATH:$PWD/linux_amd64
 
 ```bash
 # specify some version information
-qsmxt_version=1.3.2
-build_date=20230220
-fw_instance=SPECIFY
-fw_api_key=SPECIFY
-docker_id=astewartau
+QSMXT_VERSION=6.3.0
+BUILD_DATE=20231017
 
-fw login ${fw_instance}.flywheel.io:${fw_api_key}
+fw login ${FLYWHEEL_INSTANCE}.flywheel.io:${FLYWHEEL_API}
 
 # build the flywheel version of the docker container
-docker build -t "${docker_id}/qsmxt_flywheel:${qsmxt_version}_${build_date}" . -f qsm.Dockerfile
+docker build -t "${DOCKER_ID}/qsmxt_flywheel:${QSMXT_VERSION}_${BUILD_DATE}" . -f qsm.Dockerfile
 
 # push to dockerhub (if you have permission..)
-docker push "${docker_id}/qsmxt_flywheel:${qsmxt_version}_${build_date}"
+docker login -u "${DOCKER_USER}" -p "${DOCKER_TOKEN}"
+docker push "${DOCKER_ID}/qsmxt_flywheel:${QSMXT_VERSION}_${BUILD_DATE}"
 
 # test the flywheel gear locally
 cd v0/
 fw gear local --premade='gre' --magnitude=input/mag.zip --phase=input/phs.zip # the .zips should have DICOMs
 
 # login and upload to flywheel
-fw login "${fw_instance}.flywheel.io:${fw_api_key}"
+fw login "${FLYWHEEL_INSTANCE}.flywheel.io:${FLYWHEEL_API}"
 fw gear upload
 ```

@@ -26,34 +26,32 @@ def flywheel_run():
 
     # sort DICOMs
     complete_process = subprocess.run([
-        "python3",
-        "/opt/QSMxT/run_0_dicomSort.py",
+        "dicom-sort",
         "/0_dicoms",
         "/1_dicoms-sorted"
     ])
 
     # convert to BIDS
     complete_process = subprocess.run([
-        "python3",
-        "/opt/QSMxT/run_1_dicomConvert.py",
+        "dicom-convert",
         "/1_dicoms-sorted/",
         "/2_bids",
-        "--auto_yes"
+        "--auto_yes",
+        "--qsm_protocol_patterns", str(config['qsm_protocol_pattern'])
     ])
 
     # do QSM
     complete_process = subprocess.run([
-        "python3",
-        "/opt/QSMxT/run_2_qsm.py",
+        "qsmxt",
         "/2_bids",
         "/3_qsm",
         "--premade", str(config['premade']),
-        "--non_interactive"
+        "--auto_yes"
     ])
 
     # collect workflow in zip and delete folder
-    shutil.make_archive(os.path.join(out_dir, 'workflow'), 'zip', '/3_qsm/workflow_qsm')
-    shutil.rmtree(os.path.join(out_dir, '/3_qsm/workflow_qsm'))
+    shutil.make_archive(os.path.join(out_dir, 'workflow'), 'zip', '/3_qsm/workflow')
+    shutil.rmtree(os.path.join(out_dir, '/3_qsm/workflow'))
 
     # collect remaining QSMxT outputs
     shutil.make_archive(os.path.join(out_dir, 'qsm'), 'zip', '/3_qsm/')
