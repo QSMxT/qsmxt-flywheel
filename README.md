@@ -9,8 +9,8 @@ export PATH=$PATH:$PWD/linux_amd64
 
 ```bash
 # specify some version information
-QSMXT_VERSION=6.3.0
-BUILD_DATE=20231017-2
+QSMXT_VERSION=6.3.2
+BUILD_DATE=20231101
 
 fw login ${FLYWHEEL_INSTANCE}.flywheel.io:${FLYWHEEL_API}
 
