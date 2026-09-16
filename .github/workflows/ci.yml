@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Called by the release workflow, so a release runs exactly these checks.
+  workflow_call:
+
+jobs:
+  test:
+    name: Synthetic phantom
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Only for generating the synthetic DICOM input and reading the output;
+      # the gear image itself needs none of these.
+      - name: Install test dependencies
+        run: pip install --no-cache-dir numpy pydicom nibabel
+
+      - name: Build the gear image
+        run: docker build -t qsmxt_flywheel:test -f qsm.Dockerfile .
+
+      # The gear container runs with no network, so anything that quietly
+      # depended on a download (deep-learning weights, say) fails here.
+      - name: Test the gear
+        run: python3 tests/test_gear.py --image qsmxt_flywheel:test
+
+  real-data:
+    name: Real scanner DICOMs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install --no-cache-dir numpy nibabel
+
+      # 27 MB from OSF. Cached so the usual run costs nothing; the key names the
+      # OSF file ids, so pointing the test at different data refetches.
+      - name: Cache the OSF test data
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/qsmxt-flywheel-testdata
+          key: osf-ru43c-guje9-9zfgr
+
+      - name: Build the gear image
+        run: docker build -t qsmxt_flywheel:test -f qsm.Dockerfile .
+
+      - name: Test the gear on real DICOMs
+        run: |
+          python3 tests/test_real_data.py \
+            --image qsmxt_flywheel:test \
+            --cache-dir ~/.cache/qsmxt-flywheel-testdata
