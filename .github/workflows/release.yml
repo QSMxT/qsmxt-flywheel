@@ -89,9 +89,17 @@ jobs:
             org.opencontainers.image.version=${{ steps.tags.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
 
-      # The gate above tested an image built on another runner. Check the one
-      # that was actually published, so a broken push cannot pass unnoticed.
-      - name: Check the published image
+      # This runner is logged in to both registries, so a plain `docker pull`
+      # here would succeed on an image nobody else can reach — which is exactly
+      # what happened on the first release, when GHCR made the new package
+      # private. Ask each registry for an anonymous token instead.
+      - name: Check the published images are publicly pullable
+        run: |
+          echo "${{ steps.tags.outputs.tags }}" | xargs tests/check_public_image.sh
+
+      # And that the image that was actually published works, not just the one
+      # the gate built on another runner.
+      - name: Check the published image runs
         run: |
           docker pull "${{ steps.tags.outputs.verify_image }}"
           docker run --rm --network=none -v "$PWD/tests:/tests:ro" \

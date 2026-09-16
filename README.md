@@ -142,10 +142,15 @@ instead of a release tag — useful for re-pushing without cutting a release.
 Publishing needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets.
 GHCR uses the built-in `GITHUB_TOKEN`.
 
-### Uploading the gear to Flywheel
+## Running it on a Flywheel instance
 
-Still manual, and still the last step after a release. Install the Flywheel CLI:
-https://docs.flywheel.io/hc/en-us/articles/360008162214
+Uploading the gear to a site is still manual, and is the last step after a
+release.
+
+### 1. Install the Flywheel CLI
+
+[Flywheel's instructions](https://docs.flywheel.io/hc/en-us/articles/360008162214),
+or directly:
 
 ```bash
 wget https://storage.googleapis.com/flywheel-dist/cli/16.11.0/fw-linux_amd64-16.11.0.zip
@@ -153,20 +158,77 @@ unzip fw-linux_amd64-16.11.0.zip
 export PATH=$PATH:$PWD/linux_amd64
 ```
 
+### 2. Log in
+
+Your API key is in the Flywheel web UI under your profile. It is a secret —
+keep it out of shell history and out of commits.
+
 ```bash
-fw login "${FLYWHEEL_INSTANCE}.flywheel.io:${FLYWHEEL_API}"
+fw login "${FLYWHEEL_INSTANCE}.flywheel.io:${FLYWHEEL_API_KEY}"
+```
+
+### 3. Upload the gear
+
+The manifest names the image to run, so have it locally before uploading:
+
+```bash
+docker pull astewartau/qsmxt_flywheel:1.0.0_9.20.0   # the tag in v0/manifest.json
+
+git checkout 1.0.0_9.20.0   # the release matching that image
 cd v0/
 fw gear upload
 ```
 
-### Building and running it by hand
+The gear then appears in the instance's gear list, under the **Image Processing**
+suite.
+
+### 4. Run it
+
+The gear takes **two DICOM inputs**: a magnitude `.zip` and a phase `.zip`, both
+containing DICOMs from the same gradient-echo acquisition. In the web UI, open a
+session that has them, choose **Run Gear → Analysis Gear → QSMxT**, and pick the
+two files.
+
+Leaving every option alone runs QSMxT's defaults, which is the right starting
+point for human-brain GRE data. Two settings are worth a look first:
+
+- **If your zips contain series other than the QSM acquisition**, set
+  `include_pattern` (e.g. `*acq-QSM*`). By default every gradient-echo
+  acquisition found is reconstructed. This replaces `qsm_protocol_pattern` from
+  earlier versions, and matches on the BIDS key rather than the protocol name —
+  see [Selecting acquisitions](#selecting-acquisitions).
+- **`save_bids`** is useful on a first run: it returns the converted BIDS
+  dataset so you can confirm the DICOMs were classified as you expect.
+
+### 5. Check the output
+
+| File | What to look at |
+| --- | --- |
+| `qsmxt.log` | Read this first — it names every algorithm that ran |
+| `qsm.zip` | `sub-*/anat/*_Chimap.nii` is the susceptibility map, alongside the mask and `methods.md` citing the methods used on your data |
+| `workflow.zip` | Per-stage intermediates, if a result looks wrong |
+| `bids.zip` | Only with `save_bids` — check the echoes and mag/phase split are right |
+
+A sensible smoke test is one session first: confirm the Chimap looks like a
+brain, then run the rest.
+
+### Trying it without an instance
+
+`fw gear local` runs the gear on your own machine with the same inputs, which is
+quicker than a round trip through a site:
+
+```bash
+cd v0/
+fw gear local --magnitude=input/mag.zip --phase=input/phs.zip
+```
+
+Public test DICOMs, if you need a pair to try:
+[https://osf.io/ru43c/](https://osf.io/ru43c/) → `qmenta-test-files/`.
+
+### Building the image by hand
 
 ```bash
 docker build -t qsmxt_flywheel:test -f qsm.Dockerfile .
-
-# run the gear locally against your own DICOMs (the .zips should contain DICOMs)
-cd v0/
-fw gear local --magnitude=input/mag.zip --phase=input/phs.zip
 ```
 
 ## Testing
@@ -191,6 +253,13 @@ layer: every manifest enum value produces a command the real `qsmxt` accepts,
 the self-BFR inversions drop a conflicting `bf_algorithm`, `auto` passes no
 flag, `qsmxt_cmd_args` wins, and the manifest agrees with `run.py` and with the
 QSMxT version actually installed in the image.
+
+`tests/check_public_image.sh` checks an image reference is readable by an
+anonymous user. The release workflow is logged in to both registries, so a plain
+`docker pull` there proves nothing about what anyone else can reach — on the
+first release GHCR made the new package private and the authenticated check
+passed regardless. This asks each registry for an anonymous pull token instead,
+which is what a stranger's `docker pull` does first.
 
 `tests/test_real_data.py` runs the same gear on the QSMxT test dataset from
 [OSF](https://osf.io/ru43c/) — a single-echo 1 mm isotropic Siemens GRE, as the
