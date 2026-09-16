@@ -1,45 +1,196 @@
 {
     "name": "qsmxt",
     "label": "QSMxT for Automated Quantitative Susceptibility Mapping",
-    "description": "QSMxT is an end-to-end pipeline for Quantitative Susceptibility Mapping (QSM).",
+    "description": "QSMxT is an end-to-end pipeline for Quantitative Susceptibility Mapping (QSM). It converts magnitude and phase DICOMs to BIDS and reconstructs a susceptibility map for every gradient-echo acquisition it finds, with a configurable algorithm at each stage: masking, phase unwrapping and field mapping, background field removal, and dipole inversion.",
     "author": "Ashley Stewart",
+    "maintainer": "Ashley Stewart <a.stewart.au@gmail.com>",
     "cite": " Stewart, SW, Robinson, SD, O'Brien, K, et al. QSMxT: Robust masking and artifact reduction for quantitative susceptibility mapping. Magn Reson Med. 2022; 87: 1289-1300. doi:10.1002/mrm.29048 ",
-    "url": "https://github.com/QSMxT/QSMxT",
+    "url": "https://qsmxt.github.io/QSMxT/",
     "source": "https://github.com/QSMxT/qsmxt-flywheel",
     "license": "GPL-3.0",
-    "version": "6.3.2_20231101",
+    "version": "1.0.0_9.20.0",
     "environment": {
-        "PATH": "/opt/miniconda-4.7.12.1/condabin:/opt/miniconda-4.7.12.1/bin:/opt/dcm2niix-fe2f26005109f396a4f828aa438241f73fc25fe8/bin:/opt/ants-2.3.4:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/FastSurfer:/opt/nextqsm/src_tensorflow:/opt/bru2:/opt/julia-1.9.3/bin",
-        "SUBJECTS_DIR":  "/tmp",
-        "JULIA_DEPOT_PATH": "~/.julia:/opt/julia_depot",
-        "FASTSURFER_HOME": "/opt/FastSurfer",
-        "ANTSPATH": "/opt/ants-2.3.4"
+        "PATH": "/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "HOME": "/root",
+        "QSMXT_WORK_DIR": "/work"
     },
     "custom": {
         "gear-builder": {
             "category": "analysis",
-            "image": "astewartau/qsmxt_flywheel:6.3.2_20231101"
+            "image": "astewartau/qsmxt_flywheel:1.0.0_9.20.0"
         },
         "flywheel": {
-            "suite": "QSMxT"
+            "suite": "Image Processing",
+            "show-job": true,
+            "classification": {
+                "function": [
+                    "Image Processing - Structural"
+                ],
+                "modality": [
+                    "MR"
+                ],
+                "organ": [
+                    "Brain"
+                ],
+                "species": [
+                    "Human",
+                    "Phantom"
+                ],
+                "therapeutic_area": [
+                    "Neurology",
+                    "Psychiatry/Psychology"
+                ]
+            }
         }
     },
     "config": {
-        "premade": {
-            "description": "Premade pipeline; 'gre' uses sensible default for 3D-GRE acquisitions; 'epi' uses sensible defaults for 3D-EPI acquisitions (human brain only); 'bet' uses a standard BET-masking approach (human brain only); 'fast' uses a series of fast QSM algorithms; 'body' uses sensible defaults for body imaging applications; 'nextqsm' uses the suggested settings for the NeXtQSM model.",
+        "mask_preset": {
+            "description": "MASKING. Masking recipe; 'auto' leaves it to QSMxT's default, which is 'robust-threshold'. 'robust-threshold' Otsu-thresholds the phase-quality map and refines it with dilation, hole-filling and erosion. 'bet' runs brain extraction on the magnitude. 'bet-and-phase' intersects BET with an Otsu-thresholded phase-quality map, then fills holes and erodes (the ISMRM EMTP consensus masking). Deep-learning masking (HD-BET) is not offered here; see qsmxt_cmd_args.",
             "type": "string",
-            "default": "gre",
-			"enum": [
-				"gre", "epi", "bet", "fast", "body", "nextqsm"
-			]
+            "default": "auto",
+            "enum": [
+                "auto", "robust-threshold", "bet", "bet-and-phase"
+            ]
         },
-        "qsm_protocol_pattern": {
-            "description": "Pattern used to identify protocol names intended for QSM reconstruction. By default, ALL acquisitions are considered QSM. If your DICOMs contain non-QSM images, you MUST specify which protocol is intended for QSM using this pattern.",
+        "masking_input": {
+            "description": "MASKING. Image the mask is derived from, overriding what the masking recipe would use. For example 'magnitude' with the 'robust-threshold' recipe thresholds the combined magnitude instead of the phase-quality map.",
             "type": "string",
-            "default": "*"
+            "default": "auto",
+            "enum": [
+                "auto", "magnitude-first", "magnitude", "magnitude-last", "phase-quality"
+            ]
+        },
+        "inhomogeneity_correction": {
+            "description": "MASKING. Correct receive-coil inhomogeneity in the magnitude before masking.",
+            "type": "boolean",
+            "default": true
+        },
+        "unwrapping_algorithm": {
+            "description": "FIELD MAPPING. Phase unwrapping method; 'auto' leaves it to QSMxT's default, which is ROMEO. Ignored by reconstructions that start from wrapped phase.",
+            "type": "string",
+            "default": "auto",
+            "enum": [
+                "auto", "romeo", "laplacian"
+            ]
+        },
+        "b0_estimation": {
+            "description": "FIELD MAPPING. How multi-echo phase is combined into a B0 field map: a weighted average of the per-echo fields, or a linear fit of phase against echo time.",
+            "type": "string",
+            "default": "auto",
+            "enum": [
+                "auto", "weighted-avg", "linear-fit"
+            ]
+        },
+        "phase_offset_removal": {
+            "description": "FIELD MAPPING. Remove receiver phase offsets on multi-echo data.",
+            "type": "boolean",
+            "default": true
+        },
+        "bipolar_correction": {
+            "description": "FIELD MAPPING. Correct for a bipolar (alternating-polarity) readout. Requires at least 3 echoes.",
+            "type": "boolean",
+            "default": false
+        },
+        "bf_algorithm": {
+            "description": "BACKGROUND FIELD REMOVAL. Method used to strip the background field; 'auto' leaves it to QSMxT's default, which is V-SHARP. Ignored when the dipole inversion does its own background removal (TGV, QSMART, and MEDI with medi_smv enabled) - the gear drops it and logs a warning rather than letting it silently do nothing.",
+            "type": "string",
+            "default": "auto",
+            "enum": [
+                "auto", "vsharp", "pdf", "lbv", "ismv", "sharp", "resharp", "harperella", "iharperella"
+            ]
+        },
+        "qsm_algorithm": {
+            "description": "DIPOLE INVERSION. Reconstruction method; 'auto' leaves it to QSMxT's default, which is RTS. 'rts' is a robust, fast starting point; 'tkd' and 'tsvd' are direct and fastest; 'tgv' and 'qsmart' include their own background field removal, so bf_algorithm does not apply to them. Deep-learning inversions are not offered here; see qsmxt_cmd_args.",
+            "type": "string",
+            "default": "auto",
+            "enum": [
+                "auto", "rts", "tv", "tkd", "tsvd", "tgv", "tikhonov", "nltv", "medi", "tfi", "ilsqr", "qsmart", "ndi", "fansi", "fansi-tgv", "l1qsm", "whqsm", "hdqsm", "amp-pe"
+            ]
+        },
+        "medi_smv": {
+            "description": "DIPOLE INVERSION. MEDI only: use MEDI's own SMV deconvolution. This makes MEDI a single-step reconstruction from the total field, so the background field removal step is skipped.",
+            "type": "boolean",
+            "default": false
+        },
+        "qsm_reference": {
+            "description": "DIPOLE INVERSION. Reference susceptibility values to the mean inside the mask, or leave them unreferenced. Referencing to the mean is not meaningful outside the brain.",
+            "type": "string",
+            "default": "auto",
+            "enum": [
+                "auto", "mean", "none"
+            ]
+        },
+        "do_chisep": {
+            "description": "SOURCE SEPARATION. Split susceptibility into paramagnetic and diamagnetic components.",
+            "type": "boolean",
+            "default": false
+        },
+        "chisep_algorithm": {
+            "description": "SOURCE SEPARATION. Separation method. Only the two methods that run on a gradient-echo acquisition alone are offered: 'r2star-qsm' models magnitude decay, 'decompose' fits the multi-echo signal directly. The R2'-based methods need a matching multi-echo spin-echo acquisition, which this gear does not take as input.",
+            "type": "string",
+            "default": "auto",
+            "enum": [
+                "auto", "r2star-qsm", "decompose"
+            ]
+        },
+        "no_qsm": {
+            "description": "OUTPUTS. Skip QSM reconstruction and produce only the supplementary outputs selected below.",
+            "type": "boolean",
+            "default": false
+        },
+        "do_swi": {
+            "description": "OUTPUTS. Also compute susceptibility-weighted images and a minimum-intensity projection.",
+            "type": "boolean",
+            "default": false
+        },
+        "do_t2starmap": {
+            "description": "OUTPUTS. Also compute a T2* map from the multi-echo magnitude.",
+            "type": "boolean",
+            "default": false
+        },
+        "do_r2starmap": {
+            "description": "OUTPUTS. Also compute an R2* map from the multi-echo magnitude.",
+            "type": "boolean",
+            "default": false
+        },
+        "export_dicom": {
+            "description": "OUTPUTS. Also export the final maps as DICOM series, inheriting patient and study identity from the input DICOMs.",
+            "type": "boolean",
+            "default": false
+        },
+        "save_bids": {
+            "description": "OUTPUTS. Include the converted BIDS dataset (bids.zip) in the gear outputs.",
+            "type": "boolean",
+            "default": false
+        },
+        "clean_intermediates": {
+            "description": "OUTPUTS. Delete intermediate images once the pipeline finishes. Saves space, but leaves nothing in workflow.zip to inspect if a result looks wrong.",
+            "type": "boolean",
+            "default": false
+        },
+        "include_pattern": {
+            "description": "RUN SELECTION. Process only acquisitions whose BIDS key matches these glob patterns, separated by spaces (e.g. \"*acq-QSM*\"). The key looks like sub-01_ses-pre_acq-PROTOCOL_run-1_MEGRE, so the scanner protocol name appears as the acq- entity. Leave empty to process every gradient-echo acquisition found. This replaces the qsm_protocol_pattern option of earlier versions.",
+            "type": "string",
+            "default": ""
+        },
+        "exclude_pattern": {
+            "description": "RUN SELECTION. Skip acquisitions whose BIDS key matches these glob patterns, separated by spaces (e.g. \"*acq-SWI*\").",
+            "type": "string",
+            "default": ""
+        },
+        "num_echoes": {
+            "description": "RUN SELECTION. Use only the first N echoes. 0 uses all of them.",
+            "type": "integer",
+            "default": 0,
+            "minimum": 0
+        },
+        "obliquity_threshold": {
+            "description": "ACQUISITION GEOMETRY. Resample oblique acquisitions to axial when their obliquity exceeds this many degrees, as QSMxT 8.x did. -1 (the default) disables it: the dipole kernel is rotated to the acquired B0 direction instead, which is exact and interpolates nothing.",
+            "type": "number",
+            "default": -1
         },
         "qsmxt_cmd_args": {
-            "description": "Specify additional command-line arguments for QSMxT",
+            "description": "Additional command-line arguments passed to 'qsmxt run', applied after everything above and overriding it. Use this for per-algorithm parameters (e.g. --vsharp-max-radius 20) or for the deep-learning methods, which are not in the dropdowns because their model weights are downloaded from Hugging Face at runtime and so need outbound network access.",
             "type": "string",
             "default": ""
         }
