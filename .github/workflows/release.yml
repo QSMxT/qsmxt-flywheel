@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # The gate: a release publishes nothing until the same checks that run on
+  # every pull request pass on this commit.
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish the gear image
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The release tag drives the image tag. The manifest has to agree, because
+      # Flywheel pulls whatever custom.gear-builder.image names — a release that
+      # published a tag the manifest does not point at would upload a gear
+      # referring to an image that does not exist.
+      - name: Work out the version and image tags
+        id: tags
+        run: |
+          set -euo pipefail
+          MANIFEST_VERSION=$(python3 -c "import json; print(json.load(open('v0/manifest.json'))['version'])")
+
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            if [ "$VERSION" != "$MANIFEST_VERSION" ]; then
+              echo "::error::Release tag '${GITHUB_REF_NAME}' does not match v0/manifest.json version '${MANIFEST_VERSION}'."
+              exit 1
+            fi
+          else
+            VERSION="$MANIFEST_VERSION"
+            echo "::notice::Manual run — tagging from the manifest version ${VERSION}."
+          fi
+
+          DOCKERHUB_IMAGE=$(python3 -c "import json; print(json.load(open('v0/manifest.json'))['custom']['gear-builder']['image'].split(':')[0])")
+          GHCR_IMAGE="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+
+          TAGS="${DOCKERHUB_IMAGE}:${VERSION}"$'\n'"${GHCR_IMAGE}:${VERSION}"
+          # A prerelease should not move :latest out from under anyone.
+          if [ "${{ github.event.release.prerelease }}" != "true" ]; then
+            TAGS="${TAGS}"$'\n'"${DOCKERHUB_IMAGE}:latest"$'\n'"${GHCR_IMAGE}:latest"
+          fi
+
+          {
+            echo "version=${VERSION}"
+            echo "verify_image=${GHCR_IMAGE}:${VERSION}"
+            echo "tags<<TAGS_EOF"
+            echo "${TAGS}"
+            echo "TAGS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Publishing:"
+          echo "${TAGS}" | sed 's/^/  /'
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # One build, pushed to both registries under every tag above.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: qsm.Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.tags.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      # The gate above tested an image built on another runner. Check the one
+      # that was actually published, so a broken push cannot pass unnoticed.
+      - name: Check the published image
+        run: |
+          docker pull "${{ steps.tags.outputs.verify_image }}"
+          docker run --rm --network=none -v "$PWD/tests:/tests:ro" \
+            "${{ steps.tags.outputs.verify_image }}" python3 /tests/test_config.py
+
+      - name: Summary
+        run: |
+          {
+            echo "### Published \`${{ steps.tags.outputs.version }}\`"
+            echo
+            echo '```'
+            echo "${{ steps.tags.outputs.tags }}"
+            echo '```'
+            echo
+            echo "Flywheel pulls the image named in \`v0/manifest.json\`. Upload the gear with \`fw gear upload\` from \`v0/\`."
+          } >> "$GITHUB_STEP_SUMMARY"
