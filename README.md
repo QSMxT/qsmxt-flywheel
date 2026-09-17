@@ -149,38 +149,52 @@ release.
 
 ### 1. Install the Flywheel CLI
 
-[Flywheel's instructions](https://docs.flywheel.io/hc/en-us/articles/360008162214),
-or directly:
+Use the current CLI, `flyw`:
 
 ```bash
-wget https://storage.googleapis.com/flywheel-dist/cli/16.11.0/fw-linux_amd64-16.11.0.zip
-unzip fw-linux_amd64-16.11.0.zip
-export PATH=$PATH:$PWD/linux_amd64
+curl https://storage.googleapis.com/flywheel-dist/fw-cli/stable/install.sh | sh
+flyw --help
 ```
+
+:warning: **Not the legacy `fw` CLI.** `fw` 16.x bundles a Docker API 1.39
+client, and Docker Engine 25 and newer refuse anything below 1.44, so
+`fw gear upload` fails before it does anything useful:
+
+```
+Creating container from astewartau/qsmxt_flywheel:1.0.0_9.20.0 ...
+Error response from daemon: client version 1.39 is too old.
+Minimum supported API version is 1.44, please upgrade your client to a newer version
+```
+
+That is the old CLI talking to a modern Docker daemon — nothing to do with this
+gear or its image. Install `flyw` above instead. (`flyw` also speaks Podman:
+`flyw --container-client podman ...`.)
 
 ### 2. Log in
 
-Your API key is in the Flywheel web UI under your profile. It is a secret —
-keep it out of shell history and out of commits.
+Generate an API key in the Flywheel web UI on your Profile page, then:
 
 ```bash
-fw login "${FLYWHEEL_INSTANCE}.flywheel.io:${FLYWHEEL_API_KEY}"
+flyw auth login     # prompts for the key, stores it in ~/.fw/config.yml
+flyw auth status    # confirm
 ```
+
+The key is a secret — let the prompt take it rather than putting it on the
+command line, where it lands in your shell history.
 
 ### 3. Upload the gear
 
-The manifest names the image to run, so have it locally before uploading:
-
 ```bash
+git checkout 1.0.0_9.20.0                            # the release to upload
 docker pull astewartau/qsmxt_flywheel:1.0.0_9.20.0   # the tag in v0/manifest.json
-
-git checkout 1.0.0_9.20.0   # the release matching that image
 cd v0/
-fw gear upload
+flyw gear upload
 ```
 
 The gear then appears in the instance's gear list, under the **Image Processing**
-suite.
+suite. A gear's name and version combination is reserved once uploaded, so
+re-uploading a fixed gear needs a new version — bump the gear half of
+`version` in the manifest and cut a new release.
 
 ### 4. Run it
 
@@ -214,16 +228,22 @@ brain, then run the rest.
 
 ### Trying it without an instance
 
-`fw gear local` runs the gear on your own machine with the same inputs, which is
-quicker than a round trip through a site:
+`flyw gear run` runs the gear on your own machine, which is quicker than a round
+trip through a site. It expects the gear directory layout — `manifest.json`,
+`config.json`, `input/`, `output/` — which is what `v0/` is:
 
 ```bash
 cd v0/
-fw gear local --magnitude=input/mag.zip --phase=input/phs.zip
+flyw gear run
 ```
 
 Public test DICOMs, if you need a pair to try:
-[https://osf.io/ru43c/](https://osf.io/ru43c/) → `qmenta-test-files/`.
+[https://osf.io/ru43c/](https://osf.io/ru43c/) → `qmenta-test-files/`. Drop them
+in as `input/magnitude/mag.zip` and `input/phase/phs.zip`.
+
+`tests/test_gear.py` and `tests/test_real_data.py` do the same thing without the
+CLI at all — they build that layout and invoke the container directly. See
+[Testing](#testing).
 
 ### Building the image by hand
 
@@ -286,7 +306,7 @@ reconstructed real scanner data. See [Releasing](#releasing).
 ## Publishing to the Flywheel Gear Exchange
 
 The gear is not on the [Gear Exchange](https://flywheel.io/gear-exchange/#library)
-yet — today it is distributed by building the image and running `fw gear upload`
+yet — today it is distributed by building the image and running `flyw gear upload`
 into your own instance. The manifest now carries what a submission needs
 (`maintainer`, `custom.flywheel.classification`, a semver gear version), and
 `tests/test_config.py` checks those stay valid.
