@@ -209,10 +209,23 @@ cd v0/
 ~/.fw/flyw gear upload
 ```
 
-The gear then appears in the instance's gear list, under the **Image Processing**
-suite. A gear's name and version combination is reserved once uploaded, so
-re-uploading a fixed gear needs a new version — bump the gear half of
-`version` in the manifest and cut a new release.
+The upload re-tags the image into the site's own registry and pushes it there:
+
+```
+Tagging image locally as <site>.flywheel.io/qsmxt:1.0.0_9.20.0
+Getting permission to push image...
+Uploading to Docker registry...
+Registering gear on server...
+Uploaded gear with id 6aab8686838126f0379a0cca
+```
+
+So the site holds its own copy — jobs do not pull from Docker Hub at run time,
+and the gear keeps working there regardless of what happens upstream.
+
+It then appears in the instance's gear list under **Installed Gears**. A gear's
+name and version combination is reserved once uploaded, so re-uploading a fixed
+gear needs a new version — bump the gear half of `version` in the manifest and
+cut a new release.
 
 ### 4. Run it
 
