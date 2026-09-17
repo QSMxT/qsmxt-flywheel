@@ -377,14 +377,14 @@ So this is a **gear update**, not a new submission:
    what changed and including a link to a successful job run on a real instance.
 5. Flywheel's Solutions Engineering team reviews it.
 
-Two things to settle before opening it:
+One thing to settle before opening it: `CONTRIBUTING.md` tells you to fork
+`flywheel-io/public/gear-exchange`, which does not resolve. Confirm the right
+fork target first. The old `github.com/flywheel-io/exchange` repository is
+archived.
 
-- The published entry uses `custom.flywheel.suite: "Community-contributed"`,
-  which is what renders the *Community-contributed* badge in the gear info
-  panel. This repository currently sets `"Image Processing"`.
-- `CONTRIBUTING.md` tells you to fork `flywheel-io/public/gear-exchange`, which
-  does not resolve. Confirm the right fork target first. The old
-  `github.com/flywheel-io/exchange` repository is archived.
+The manifest keeps `custom.flywheel.suite: "Community-contributed"` to match the
+published entry — that field is what renders the *Community-contributed* badge in
+the gear info panel, so an update MR should not quietly change it.
 
 ## Upgrading a QSMxT version
 
