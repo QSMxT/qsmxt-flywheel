@@ -153,8 +153,23 @@ Use the current CLI, `flyw`:
 
 ```bash
 curl https://storage.googleapis.com/flywheel-dist/fw-cli/stable/install.sh | sh
-flyw --help
+~/.fw/flyw --version
 ```
+
+The installer puts `flyw` in `~/.fw` and adds that to your `PATH` **through your
+shell profile**, so a plain `flyw` will not be found until you start a new shell.
+Call it by full path (`~/.fw/flyw`) until then — that is all the `~/.fw/` prefix
+below means.
+
+If your site pins a particular CLI version, point the installer at it and it
+installs the compatible one:
+
+```bash
+FW_SITE_URL=https://${FLYWHEEL_INSTANCE}.flywheel.io \
+  curl -s https://storage.googleapis.com/flywheel-dist/fw-cli/stable/install.sh | sh
+```
+
+Pinning a version directly also works — e.g. `.../fw-cli/0.36.1/install.sh`.
 
 :warning: **Not the legacy `fw` CLI.** `fw` 16.x bundles a Docker API 1.39
 client, and Docker Engine 25 and newer refuse anything below 1.44, so
@@ -175,9 +190,11 @@ gear or its image. Install `flyw` above instead. (`flyw` also speaks Podman:
 Generate an API key in the Flywheel web UI on your Profile page, then:
 
 ```bash
-flyw auth login     # prompts for the key, stores it in ~/.fw/config.yml
-flyw auth status    # confirm
+~/.fw/flyw login            # prompts for the key, stores it in ~/.fw/config.yml
+~/.fw/flyw login --status   # confirm
 ```
+
+(`flyw auth login` is the same command spelled out in full.)
 
 The key is a secret — let the prompt take it rather than putting it on the
 command line, where it lands in your shell history.
@@ -188,7 +205,8 @@ command line, where it lands in your shell history.
 git checkout 1.0.0_9.20.0                            # the release to upload
 docker pull astewartau/qsmxt_flywheel:1.0.0_9.20.0   # the tag in v0/manifest.json
 cd v0/
-flyw gear upload
+~/.fw/flyw gear --validate manifest.json             # optional, catches mistakes early
+~/.fw/flyw gear upload
 ```
 
 The gear then appears in the instance's gear list, under the **Image Processing**
@@ -234,7 +252,7 @@ trip through a site. It expects the gear directory layout — `manifest.json`,
 
 ```bash
 cd v0/
-flyw gear run
+~/.fw/flyw gear run
 ```
 
 Public test DICOMs, if you need a pair to try:
@@ -259,6 +277,7 @@ pip install numpy pydicom nibabel
 
 python3 tests/test_gear.py       # synthetic phantom, no download
 python3 tests/test_real_data.py  # real scanner DICOMs, 27 MB from OSF
+tests/test_manifest_cli.sh       # manifest, against Flywheel's own CLI
 ```
 
 `tests/make_test_dicoms.py` builds a small synthetic multi-echo GRE acquisition
@@ -273,6 +292,15 @@ layer: every manifest enum value produces a command the real `qsmxt` accepts,
 the self-BFR inversions drop a conflicting `bf_algorithm`, `auto` passes no
 flag, `qsmxt_cmd_args` wins, and the manifest agrees with `run.py` and with the
 QSMxT version actually installed in the image.
+
+`tests/test_manifest_cli.sh` validates `v0/manifest.json` with **Flywheel's own
+CLI** (`flyw gear --validate`), installing it if needed. Everything else here
+drives the container directly, which is how out-of-date CLI instructions went
+unnoticed until someone tried to follow them. It checks the manifest against
+Flywheel's schema rather than our reading of it, and catches things we would not
+think to write — it objects if the manifest version disagrees with its docker
+image tag, for one. It also feeds the validator a deliberately broken manifest
+and fails if that is accepted.
 
 `tests/check_public_image.sh` checks an image reference is readable by an
 anonymous user. The release workflow is logged in to both registries, so a plain
