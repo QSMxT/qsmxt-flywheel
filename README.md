@@ -119,12 +119,13 @@ QSMxT release.
 That triggers [`.github/workflows/release.yml`](.github/workflows/release.yml),
 which:
 
-1. runs the full CI suite on the release commit — synthetic phantom *and* real
-   scanner DICOMs — and publishes nothing if either fails;
+1. runs the full CI suite on the release commit — synthetic phantom, manifest
+   validation, and real scanner DICOMs — and publishes nothing if any of them
+   fails;
 2. derives the image tags from the release tag, and **refuses the release if the
-   tag does not match `v0/manifest.json`** (Flywheel pulls whatever
-   `custom.gear-builder.image` names, so a mismatch would upload a gear pointing
-   at an image that does not exist);
+   tag does not match `v0/manifest.json`** (`flyw gear upload` pulls whatever
+   `custom.gear-builder.image` names before copying it to the site, so a
+   mismatch would make the upload fail or ship the wrong image);
 3. builds once and pushes to both registries:
 
    | | |
@@ -133,7 +134,10 @@ which:
    | GHCR | `ghcr.io/qsmxt/qsmxt-flywheel:<version>` |
 
    Both also get `:latest`, unless the release is marked as a prerelease;
-4. pulls the published image back and re-runs the configuration checks against
+4. checks each published tag is readable by an **anonymous** user, since the
+   runner is logged in to both registries and would happily verify an image
+   nobody else can reach — which is exactly what happened on the first release;
+5. pulls the published image back and re-runs the configuration checks against
    it, so a broken push cannot go unnoticed.
 
 A `workflow_dispatch` run does the same thing, tagging from the manifest version
@@ -334,14 +338,15 @@ an obliquely acquired volume — in about 20 seconds.
 
 Pass `--cache-dir` to keep the download between runs.
 
-The gear container is run with `--network=none` in both, so anything that
+Both suites that run the gear do so with `--network=none`, so anything that
 quietly depended on a download — deep-learning weights, say — fails the test
 rather than only failing at a customer site.
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs both suites on
-every push and pull request, and the release workflow calls that same workflow as
-its gate — so a release runs exactly the checks a pull request does, not a
-parallel copy of them, and nothing is published unless the gear has just
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs three jobs on
+every push and pull request — **Synthetic phantom**, **Manifest (Flywheel CLI)**
+and **Real scanner DICOMs** — and the release workflow calls that same workflow
+as its gate, so a release runs exactly the checks a pull request does rather than
+a parallel copy of them. Nothing is published unless the gear has just
 reconstructed real scanner data. See [Releasing](#releasing).
 
 ## Publishing to the Flywheel Gear Exchange
