@@ -31,6 +31,19 @@ jobs:
       - name: Test the gear
         run: python3 tests/test_gear.py --image qsmxt_flywheel:test
 
+  manifest:
+    name: Manifest (Flywheel CLI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Validates against Flywheel's own schema rather than our reading of it.
+      # Everything else tests the gear by driving the container directly, which
+      # is how out-of-date CLI instructions went unnoticed until someone tried
+      # to follow them.
+      - name: Validate the gear manifest
+        run: tests/test_manifest_cli.sh
+
   real-data:
     name: Real scanner DICOMs
     runs-on: ubuntu-latest

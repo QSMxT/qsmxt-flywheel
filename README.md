@@ -119,12 +119,13 @@ QSMxT release.
 That triggers [`.github/workflows/release.yml`](.github/workflows/release.yml),
 which:
 
-1. runs the full CI suite on the release commit — synthetic phantom *and* real
-   scanner DICOMs — and publishes nothing if either fails;
+1. runs the full CI suite on the release commit — synthetic phantom, manifest
+   validation, and real scanner DICOMs — and publishes nothing if any of them
+   fails;
 2. derives the image tags from the release tag, and **refuses the release if the
-   tag does not match `v0/manifest.json`** (Flywheel pulls whatever
-   `custom.gear-builder.image` names, so a mismatch would upload a gear pointing
-   at an image that does not exist);
+   tag does not match `v0/manifest.json`** (`flyw gear upload` pulls whatever
+   `custom.gear-builder.image` names before copying it to the site, so a
+   mismatch would make the upload fail or ship the wrong image);
 3. builds once and pushes to both registries:
 
    | | |
@@ -133,7 +134,10 @@ which:
    | GHCR | `ghcr.io/qsmxt/qsmxt-flywheel:<version>` |
 
    Both also get `:latest`, unless the release is marked as a prerelease;
-4. pulls the published image back and re-runs the configuration checks against
+4. checks each published tag is readable by an **anonymous** user, since the
+   runner is logged in to both registries and would happily verify an image
+   nobody else can reach — which is exactly what happened on the first release;
+5. pulls the published image back and re-runs the configuration checks against
    it, so a broken push cannot go unnoticed.
 
 A `workflow_dispatch` run does the same thing, tagging from the manifest version
@@ -149,38 +153,83 @@ release.
 
 ### 1. Install the Flywheel CLI
 
-[Flywheel's instructions](https://docs.flywheel.io/hc/en-us/articles/360008162214),
-or directly:
+Use the current CLI, `flyw`:
 
 ```bash
-wget https://storage.googleapis.com/flywheel-dist/cli/16.11.0/fw-linux_amd64-16.11.0.zip
-unzip fw-linux_amd64-16.11.0.zip
-export PATH=$PATH:$PWD/linux_amd64
+curl https://storage.googleapis.com/flywheel-dist/fw-cli/stable/install.sh | sh
+~/.fw/flyw --version
 ```
+
+The installer puts `flyw` in `~/.fw` and adds that to your `PATH` **through your
+shell profile**, so a plain `flyw` will not be found until you start a new shell.
+Call it by full path (`~/.fw/flyw`) until then — that is all the `~/.fw/` prefix
+below means.
+
+If your site pins a particular CLI version, point the installer at it and it
+installs the compatible one:
+
+```bash
+FW_SITE_URL=https://${FLYWHEEL_INSTANCE}.flywheel.io \
+  curl -s https://storage.googleapis.com/flywheel-dist/fw-cli/stable/install.sh | sh
+```
+
+Pinning a version directly also works — e.g. `.../fw-cli/0.36.1/install.sh`.
+
+:warning: **Not the legacy `fw` CLI.** `fw` 16.x bundles a Docker API 1.39
+client, and Docker Engine 25 and newer refuse anything below 1.44, so
+`fw gear upload` fails before it does anything useful:
+
+```
+Creating container from astewartau/qsmxt_flywheel:1.0.0_9.20.0 ...
+Error response from daemon: client version 1.39 is too old.
+Minimum supported API version is 1.44, please upgrade your client to a newer version
+```
+
+That is the old CLI talking to a modern Docker daemon — nothing to do with this
+gear or its image. Install `flyw` above instead. (`flyw` also speaks Podman:
+`flyw --container-client podman ...`.)
 
 ### 2. Log in
 
-Your API key is in the Flywheel web UI under your profile. It is a secret —
-keep it out of shell history and out of commits.
+Generate an API key in the Flywheel web UI on your Profile page, then:
 
 ```bash
-fw login "${FLYWHEEL_INSTANCE}.flywheel.io:${FLYWHEEL_API_KEY}"
+~/.fw/flyw login            # prompts for the key, stores it in ~/.fw/config.yml
+~/.fw/flyw login --status   # confirm
 ```
+
+(`flyw auth login` is the same command spelled out in full.)
+
+The key is a secret — let the prompt take it rather than putting it on the
+command line, where it lands in your shell history.
 
 ### 3. Upload the gear
 
-The manifest names the image to run, so have it locally before uploading:
-
 ```bash
+git checkout 1.0.0_9.20.0                            # the release to upload
 docker pull astewartau/qsmxt_flywheel:1.0.0_9.20.0   # the tag in v0/manifest.json
-
-git checkout 1.0.0_9.20.0   # the release matching that image
 cd v0/
-fw gear upload
+~/.fw/flyw gear --validate manifest.json             # optional, catches mistakes early
+~/.fw/flyw gear upload
 ```
 
-The gear then appears in the instance's gear list, under the **Image Processing**
-suite.
+The upload re-tags the image into the site's own registry and pushes it there:
+
+```
+Tagging image locally as <site>.flywheel.io/qsmxt:1.0.0_9.20.0
+Getting permission to push image...
+Uploading to Docker registry...
+Registering gear on server...
+Uploaded gear with id 6aab8686838126f0379a0cca
+```
+
+So the site holds its own copy — jobs do not pull from Docker Hub at run time,
+and the gear keeps working there regardless of what happens upstream.
+
+It then appears in the instance's gear list under **Installed Gears**. A gear's
+name and version combination is reserved once uploaded, so re-uploading a fixed
+gear needs a new version — bump the gear half of `version` in the manifest and
+cut a new release.
 
 ### 4. Run it
 
@@ -214,16 +263,22 @@ brain, then run the rest.
 
 ### Trying it without an instance
 
-`fw gear local` runs the gear on your own machine with the same inputs, which is
-quicker than a round trip through a site:
+`flyw gear run` runs the gear on your own machine, which is quicker than a round
+trip through a site. It expects the gear directory layout — `manifest.json`,
+`config.json`, `input/`, `output/` — which is what `v0/` is:
 
 ```bash
 cd v0/
-fw gear local --magnitude=input/mag.zip --phase=input/phs.zip
+~/.fw/flyw gear run
 ```
 
 Public test DICOMs, if you need a pair to try:
-[https://osf.io/ru43c/](https://osf.io/ru43c/) → `qmenta-test-files/`.
+[https://osf.io/ru43c/](https://osf.io/ru43c/) → `qmenta-test-files/`. Drop them
+in as `input/magnitude/mag.zip` and `input/phase/phs.zip`.
+
+`tests/test_gear.py` and `tests/test_real_data.py` do the same thing without the
+CLI at all — they build that layout and invoke the container directly. See
+[Testing](#testing).
 
 ### Building the image by hand
 
@@ -239,6 +294,7 @@ pip install numpy pydicom nibabel
 
 python3 tests/test_gear.py       # synthetic phantom, no download
 python3 tests/test_real_data.py  # real scanner DICOMs, 27 MB from OSF
+tests/test_manifest_cli.sh       # manifest, against Flywheel's own CLI
 ```
 
 `tests/make_test_dicoms.py` builds a small synthetic multi-echo GRE acquisition
@@ -253,6 +309,15 @@ layer: every manifest enum value produces a command the real `qsmxt` accepts,
 the self-BFR inversions drop a conflicting `bf_algorithm`, `auto` passes no
 flag, `qsmxt_cmd_args` wins, and the manifest agrees with `run.py` and with the
 QSMxT version actually installed in the image.
+
+`tests/test_manifest_cli.sh` validates `v0/manifest.json` with **Flywheel's own
+CLI** (`flyw gear --validate`), installing it if needed. Everything else here
+drives the container directly, which is how out-of-date CLI instructions went
+unnoticed until someone tried to follow them. It checks the manifest against
+Flywheel's schema rather than our reading of it, and catches things we would not
+think to write — it objects if the manifest version disagrees with its docker
+image tag, for one. It also feeds the validator a deliberately broken manifest
+and fails if that is accepted.
 
 `tests/check_public_image.sh` checks an image reference is readable by an
 anonymous user. The release workflow is logged in to both registries, so a plain
@@ -273,20 +338,21 @@ an obliquely acquired volume — in about 20 seconds.
 
 Pass `--cache-dir` to keep the download between runs.
 
-The gear container is run with `--network=none` in both, so anything that
+Both suites that run the gear do so with `--network=none`, so anything that
 quietly depended on a download — deep-learning weights, say — fails the test
 rather than only failing at a customer site.
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs both suites on
-every push and pull request, and the release workflow calls that same workflow as
-its gate — so a release runs exactly the checks a pull request does, not a
-parallel copy of them, and nothing is published unless the gear has just
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs three jobs on
+every push and pull request — **Synthetic phantom**, **Manifest (Flywheel CLI)**
+and **Real scanner DICOMs** — and the release workflow calls that same workflow
+as its gate, so a release runs exactly the checks a pull request does rather than
+a parallel copy of them. Nothing is published unless the gear has just
 reconstructed real scanner data. See [Releasing](#releasing).
 
 ## Publishing to the Flywheel Gear Exchange
 
 The gear is not on the [Gear Exchange](https://flywheel.io/gear-exchange/#library)
-yet — today it is distributed by building the image and running `fw gear upload`
+yet — today it is distributed by building the image and running `flyw gear upload`
 into your own instance. The manifest now carries what a submission needs
 (`maintainer`, `custom.flywheel.classification`, a semver gear version), and
 `tests/test_config.py` checks those stay valid.
