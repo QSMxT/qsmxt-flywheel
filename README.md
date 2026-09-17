@@ -106,15 +106,21 @@ Docker Hub and GHCR:
 #    - version and custom.gear-builder.image in v0/manifest.json
 
 # 2. tag the release with exactly the manifest version
-gh release create 1.0.0_9.20.0 --generate-notes
+gh release create 2.0.0_9.20.0 --generate-notes
 ```
 
-The gear version is `<gear-semver>_<qsmxt-version>` — `1.0.0_9.20.0` is gear
-1.0.0 wrapping QSMxT 9.20.0. This is the convention the accepted gears in the
+The gear version is `<gear-semver>_<qsmxt-version>` — `2.0.0_9.20.0` is gear
+2.0.0 wrapping QSMxT 9.20.0. This is the convention the accepted gears in the
 Flywheel Gear Exchange use (`bids-mriqc` is `2.1.4_24.0.2`), and it lets the
 gear be re-released — a `run.py` fix, a manifest correction — without pretending
 QSMxT changed. Bump the left half for gear changes and the right half to track a
 QSMxT release.
+
+The gear half starts at 2.0.0 because the
+[Gear Exchange](#publishing-to-the-flywheel-gear-exchange) already carries
+`1.3.2_20230220` from 2023. A version has to move forward from what is published
+there, and a major bump is the honest one for a rewrite that removed `premade`
+and `qsm_protocol_pattern`.
 
 That triggers [`.github/workflows/release.yml`](.github/workflows/release.yml),
 which:
@@ -180,7 +186,7 @@ client, and Docker Engine 25 and newer refuse anything below 1.44, so
 `fw gear upload` fails before it does anything useful:
 
 ```
-Creating container from astewartau/qsmxt_flywheel:1.0.0_9.20.0 ...
+Creating container from astewartau/qsmxt_flywheel:2.0.0_9.20.0 ...
 Error response from daemon: client version 1.39 is too old.
 Minimum supported API version is 1.44, please upgrade your client to a newer version
 ```
@@ -206,8 +212,8 @@ command line, where it lands in your shell history.
 ### 3. Upload the gear
 
 ```bash
-git checkout 1.0.0_9.20.0                            # the release to upload
-docker pull astewartau/qsmxt_flywheel:1.0.0_9.20.0   # the tag in v0/manifest.json
+git checkout 2.0.0_9.20.0                            # the release to upload
+docker pull astewartau/qsmxt_flywheel:2.0.0_9.20.0   # the tag in v0/manifest.json
 cd v0/
 ~/.fw/flyw gear --validate manifest.json             # optional, catches mistakes early
 ~/.fw/flyw gear upload
@@ -216,7 +222,7 @@ cd v0/
 The upload re-tags the image into the site's own registry and pushes it there:
 
 ```
-Tagging image locally as <site>.flywheel.io/qsmxt:1.0.0_9.20.0
+Tagging image locally as <site>.flywheel.io/qsmxt:2.0.0_9.20.0
 Getting permission to push image...
 Uploading to Docker registry...
 Registering gear on server...
@@ -351,27 +357,34 @@ reconstructed real scanner data. See [Releasing](#releasing).
 
 ## Publishing to the Flywheel Gear Exchange
 
-The gear is not on the [Gear Exchange](https://flywheel.io/gear-exchange/#library)
-yet — today it is distributed by building the image and running `flyw gear upload`
-into your own instance. The manifest now carries what a submission needs
-(`maintainer`, `custom.flywheel.classification`, a semver gear version), and
-`tests/test_config.py` checks those stay valid.
+QSMxT **is already on the** [Gear Exchange](https://flywheel.io/gear-exchange/#library),
+as a community-contributed gear. The entry is
+[`gears/flywheel/qsmtx.json`](https://gitlab.com/flywheel-io/scientific-solutions/gears/gear-exchange/-/blob/master/gears/flywheel/qsmtx.json)
+— note the transposed filename, which is why searching the repository for
+"qsmxt" finds nothing. It still carries `1.3.2_20230220` from February 2023,
+whose only config option is the long-gone `premade`.
 
-Submitting is a reviewed merge request, not something CI can do:
+So this is a **gear update**, not a new submission:
 
-1. Fork the Gear Exchange repository on GitLab and branch.
-2. Add the manifest as `gears/<org>/<gear-name>.json`.
-3. Make sure the image tag it names is public (the release workflow does this).
-4. Open a merge request using the **New Gear Submission** template, including a
-   link to a successful job run on your own Flywheel instance.
-5. Flywheel's Solutions Engineering team reviews it; updates later go through the
-   **Gear Update Submission** template.
+1. Fork <https://gitlab.com/flywheel-io/scientific-solutions/gears/gear-exchange>
+   and branch.
+2. Replace the contents of `gears/flywheel/qsmtx.json` with `v0/manifest.json`
+   from the release being submitted. Keep the existing path — renaming it is a
+   separate conversation with Flywheel, not something to slip into an update.
+3. Make sure the image tag it names is publicly pullable — the release workflow
+   checks this, and `tests/check_public_image.sh` does it on demand.
+4. Open a merge request using the **Gear Update Submission** template, saying
+   what changed and including a link to a successful job run on a real instance.
+5. Flywheel's Solutions Engineering team reviews it.
 
-The live repository is
-<https://gitlab.com/flywheel-io/scientific-solutions/gears/gear-exchange>. Note
-that its `CONTRIBUTING.md` tells you to fork `flywheel-io/public/gear-exchange`,
-which does not resolve — worth confirming the right fork target before starting.
-The old `github.com/flywheel-io/exchange` repository is archived.
+Two things to settle before opening it:
+
+- The published entry uses `custom.flywheel.suite: "Community-contributed"`,
+  which is what renders the *Community-contributed* badge in the gear info
+  panel. This repository currently sets `"Image Processing"`.
+- `CONTRIBUTING.md` tells you to fork `flywheel-io/public/gear-exchange`, which
+  does not resolve. Confirm the right fork target first. The old
+  `github.com/flywheel-io/exchange` repository is archived.
 
 ## Upgrading a QSMxT version
 

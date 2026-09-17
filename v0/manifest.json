@@ -8,7 +8,7 @@
     "url": "https://qsmxt.github.io/QSMxT/",
     "source": "https://github.com/QSMxT/qsmxt-flywheel",
     "license": "GPL-3.0",
-    "version": "1.0.0_9.20.0",
+    "version": "2.0.0_9.20.0",
     "environment": {
         "PATH": "/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
         "HOME": "/root",
@@ -17,7 +17,7 @@
     "custom": {
         "gear-builder": {
             "category": "analysis",
-            "image": "astewartau/qsmxt_flywheel:1.0.0_9.20.0"
+            "image": "astewartau/qsmxt_flywheel:2.0.0_9.20.0"
         },
         "flywheel": {
             "suite": "Image Processing",
